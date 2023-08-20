@@ -23,21 +23,16 @@ public struct ReduceFrameEvenlySpaced: VideoFrameReducer {
     public init() {}
     
     public func reduce(originalFPS: Float, to targetFPS: Float, with videoDuration: Float) -> [Int] {
-        let stride = Int(originalFPS / targetFPS)
-        var counter = 0
+        let originalFrames = Int(originalFPS * videoDuration)
+        let targetFrames = Int(videoDuration * targetFPS)
         
-        let originalFrames = (0..<Int(originalFPS * videoDuration)).map({ $0 })
-        
-        var res = [Int]()
-        
-        while res.count < Int(targetFPS * videoDuration) {
-            let index = counter * stride
-            let frame = originalFrames[index]
-            res.append(frame)
-            counter += 1
+        //
+        var rangeArr = Array(repeating: 0, count: targetFrames)
+        for i in 0..<targetFrames {
+            rangeArr[i] = Int(floor(Double(originalFrames) * Double(i) / Double(targetFrames)))
         }
         
-        return res
+        return rangeArr
     }
 }
 
