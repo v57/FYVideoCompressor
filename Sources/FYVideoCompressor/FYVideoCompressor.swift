@@ -163,6 +163,7 @@ public class FYVideoCompressor {
                               quality: VideoQuality = .mediumQuality,
                               outputPath: URL? = nil,
                               frameReducer: VideoFrameReducer = ReduceFrameEvenlySpaced(),
+                              progress: ((CMTime, CMTime) -> Void)? = nil,
                               completion: @escaping (Result<URL, Error>) -> Void) {
         self.videoFrameReducer = frameReducer
         let asset = AVAsset(url: url)
@@ -220,6 +221,8 @@ public class FYVideoCompressor {
         } else {
             _outputPath = FileManager.tempDirectory(with: "CompressedVideo")
         }
+        
+        let progress = CompressionProgress(duration: asset.duration, callback: progress)
         _compress(asset: asset,
                   fileType: .mp4,
                   videoTrack,
@@ -228,11 +231,12 @@ public class FYVideoCompressor {
                   audioSettings,
                   targetFPS: quality.value.fps,
                   outputPath: _outputPath,
+                  progress: progress,
                   completion: completion)
     }
     
     /// Compress Video with config.
-    public func compressVideo(_ url: URL, config: CompressionConfig, frameReducer: VideoFrameReducer = ReduceFrameEvenlySpaced(), completion: @escaping (Result<URL, Error>) -> Void) {
+    public func compressVideo(_ url: URL, config: CompressionConfig, frameReducer: VideoFrameReducer = ReduceFrameEvenlySpaced(), progress: ((CMTime, CMTime) -> Void)? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
         self.videoFrameReducer = frameReducer
         
         let asset = AVAsset(url: url)
@@ -305,6 +309,7 @@ public class FYVideoCompressor {
         print("****************************************")
 #endif
         
+        let progress = CompressionProgress(duration: asset.duration, callback: progress)
         _compress(asset: asset,
                   fileType: config.fileType,
                   videoTrack,
@@ -313,6 +318,7 @@ public class FYVideoCompressor {
                   audioSettings,
                   targetFPS: config.fps,
                   outputPath: _outputPath,
+                  progress: progress,
                   completion: completion)
     }
     
@@ -342,6 +348,7 @@ public class FYVideoCompressor {
                            _ audioSettings: [String: Any]?,
                            targetFPS: Float,
                            outputPath: URL,
+                           progress: CompressionProgress,
                            completion: @escaping (Result<URL, Error>) -> Void) {
         // video
         let videoOutput = AVAssetReaderTrackOutput.init(track: videoTrack,
@@ -413,7 +420,7 @@ public class FYVideoCompressor {
             
             outputVideoDataByReducingFPS(videoInput: videoInput,
                                          videoOutput: videoOutput,
-                                         frameIndexArr: reduceFPS ? frameIndexArr : []) {
+                                         frameIndexArr: reduceFPS ? frameIndexArr : [], progress: progress) {
                 self.group.leave()
             }
             
@@ -506,6 +513,7 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
     private func outputVideoDataByReducingFPS(videoInput: AVAssetWriterInput,
                                               videoOutput: AVAssetReaderTrackOutput,
                                               frameIndexArr: [Int],
+                                              progress: CompressionProgress,
                                               completion: @escaping(() -> Void)) {
         var counter = 0
         var index = 0
@@ -513,6 +521,7 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
         videoInput.requestMediaDataWhenReady(on: videoCompressQueue) {
             while videoInput.isReadyForMoreMediaData {
                 if let buffer = videoOutput.copyNextSampleBuffer() {
+                    progress.send(progress: CMSampleBufferGetPresentationTimeStamp(buffer))
                     if frameIndexArr.isEmpty {
                         videoInput.append(buffer)
                     } else { // reduce FPS
@@ -719,5 +728,13 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
         } else {
             return true // Assume keyframe if attachment is not present
         }
+    }
+}
+
+private struct CompressionProgress {
+    var duration: CMTime
+    var callback: ((CMTime, CMTime) -> ())?
+    func send(progress: CMTime) {
+        callback?(duration, progress)
     }
 }
