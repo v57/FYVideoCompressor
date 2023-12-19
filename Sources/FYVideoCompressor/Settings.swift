@@ -22,10 +22,10 @@ public extension VideoCompressorSettings {
     set(AVVideoScalingModeKey, value.rawValue)
   }
   func width(_ value: Double) -> Self {
-    set(AVVideoWidthKey, value)
+    set(AVVideoWidthKey, value.rounded(.down))
   }
   func height(_ value: Double) -> Self {
-    set(AVVideoHeightKey, value)
+    set(AVVideoHeightKey, value.rounded(.down))
   }
   func wideColor(_ value: Bool = true) -> Self {
     set(AVVideoAllowWideColorKey, value)
