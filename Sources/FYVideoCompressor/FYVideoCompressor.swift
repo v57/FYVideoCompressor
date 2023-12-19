@@ -164,20 +164,8 @@ public class FYVideoCompressor {
         }
         
 #if DEBUG
-        print("************** Video info **************")
-        
-        print("🎬 Video ")
-        print("ORIGINAL:")
-        print("video size: \(url.sizePerMB())M")
-        print("bitrate: \(videoTrack.estimatedDataRate) b/s")
-        print("fps: \(videoTrack.nominalFrameRate)") //
-        print("scale size: \(videoTrack.naturalSize)")
-        
-        print("TARGET:")
-        print("video bitrate: \(targetVideoBitrate) b/s")
-        print("fps: \(config.fps)")
-        print("scale size: (\(targetSize))")
-        print("****************************************")
+        print("🎬: \(url.sizePerMB())MB, \(Int(videoTrack.naturalSize.width))x\(Int(videoTrack.naturalSize.height)), \(Int(videoTrack.estimatedDataRate / 1024)) kb/s, \(videoTrack.nominalFrameRate) fps")
+        print("📦: \(Int(targetSize.width))x\(Int(targetSize.height)), \(Int(targetVideoBitrate / 1024)) kb/s, \(config.fps) fps")
 #endif
         
         let progress = CompressionProgress(duration: asset.duration, callback: progress)
@@ -313,12 +301,8 @@ public class FYVideoCompressor {
 #if DEBUG
                         let endTime = Date()
                         let elapse = endTime.timeIntervalSince(startTime)
-                        print("******** Compression finished ✅**********")
-                        print("Compressed video:")
-                        print("time: \(elapse)")
-                        print("size: \(outputPath.sizePerMB())M")
-                        print("path: \(outputPath)")
-                        print("******************************************")
+                        print("🎉 \(elapse), \(outputPath.sizePerMB())MB")
+                        print("📍 \(outputPath)")
 #endif
                         DispatchQueue.main.sync {
                             completion(.success(outputPath))
@@ -349,22 +333,16 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
     }
     
     private func createAudioSettingsWithAudioTrack(_ audioTrack: AVAssetTrack, bitrate: Float, sampleRate: Int) -> [String: Any] {
+        let format = kAudioFormatMPEG4AAC
+        let channels = 2
 #if DEBUG
         if let audioFormatDescs = audioTrack.formatDescriptions as? [CMFormatDescription], let formatDescription = audioFormatDescs.first {
-            print("🔊 Audio")
-            print("ORINGIAL:")
-            print("bitrate: \(audioTrack.estimatedDataRate)")
-            if let streamBasicDescription = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) {
-                print("sampleRate: \(streamBasicDescription.pointee.mSampleRate)")
-                print("channels: \(streamBasicDescription.pointee.mChannelsPerFrame)")
-                print("formatID: \(streamBasicDescription.pointee.mFormatID)")
+            if let stream = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription)?.pointee {
+                print("🔊 \(stream.mFormatID) \(stream.mChannelsPerFrame)c, \(stream.mSampleRate) Hz, \(audioTrack.estimatedDataRate / 1024) kb/s")
+            } else {
+                print("🔊 \(audioTrack.estimatedDataRate / 1024) kb/s")
             }
-            
-            print("TARGET:")
-            print("bitrate: \(bitrate)")
-            print("sampleRate: \(sampleRate)")
-//            print("channels: \(2)")
-            print("formatID: \(kAudioFormatMPEG4AAC)")
+            print("📦 \(format) \(channels)c, \(sampleRate) Hz, \(bitrate / 1024) kb/s")
         }
 #endif
         
@@ -373,10 +351,10 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
         audioChannelLayout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
         
         return [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVFormatIDKey: format,
             AVSampleRateKey: sampleRate,
             AVEncoderBitRateKey: bitrate,
-            AVNumberOfChannelsKey: 2,
+            AVNumberOfChannelsKey: channels,
             AVChannelLayoutKey: Data(bytes: &audioChannelLayout, count: MemoryLayout<AudioChannelLayout>.size)
         ]
     }
