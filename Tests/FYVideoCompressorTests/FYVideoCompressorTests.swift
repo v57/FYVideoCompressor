@@ -61,17 +61,12 @@ final class FYVideoCompressorTests: XCTestCase {
         XCTAssertEqual(movExtension.fileExtension, "mov")
     }
     
-    func testGetRandomFramesIndexesCount() {
-        let arr = compressor.getFrameIndexesWith(originalFPS: 50, targetFPS: 30, duration: 10)
-        XCTAssertEqual(arr.count, 300)
-    }
-    
     func testCompressVideo() {
         let expectation = XCTestExpectation(description: "compress video")
         
 //        var sampleVideoPath = localVideoURL // sampleVideoPath
         var compressedVideoPath: URL!
-        compressor.compressVideo(sampleVideoPath, quality: .lowQuality, frameReducer: ReduceFrameRandomly()) { result in
+        compressor.compressVideo(sampleVideoPath, config: .h264(), frameReducer: ReduceFrameRandomly()) { result in
             switch result {
             case .success(let video):
                 compressedVideoPath = video
@@ -88,10 +83,9 @@ final class FYVideoCompressorTests: XCTestCase {
     
     func testCompressVideoWithScale() {
         let expectation = XCTestExpectation(description: "compress video")
-        let config = FYVideoCompressor.CompressionConfig(scale: CGSize(width: -1, height: -1))
         
         var compressedVideoPath: URL!
-        compressor.compressVideo(sampleVideoPath, config: config) { result in
+        compressor.compressVideo(sampleVideoPath, config: .h264(size: CGSize(width: -1, height: -1))) { result in
             switch result {
             case .success(let video):
                 compressedVideoPath = video
@@ -109,10 +103,9 @@ final class FYVideoCompressorTests: XCTestCase {
     
     func testCompressVideoWithVideoBitrate() {
         let expectation = XCTestExpectation(description: "compress video")
-        let config = FYVideoCompressor.CompressionConfig(videoBitrate: 200_000)
         
         var compressedVideoPath: URL!
-        compressor.compressVideo(sampleVideoPath, config: config) { result in
+        compressor.compressVideo(sampleVideoPath, config: .h264(bitrate: 200000)) { result in
             switch result {
             case .success(let video):
                 compressedVideoPath = video
@@ -130,10 +123,9 @@ final class FYVideoCompressorTests: XCTestCase {
     
     func testCompressVideoWithVideomaxKeyFrameInterval() {
         let expectation = XCTestExpectation(description: "compress video")
-        let config = FYVideoCompressor.CompressionConfig(videomaxKeyFrameInterval: 1)
         
         var compressedVideoPath: URL!
-        compressor.compressVideo(sampleVideoPath, config: config) { result in
+        compressor.compressVideo(sampleVideoPath, config: .h264(maxKeyframeInterval: 1)) { result in
             switch result {
             case .success(let video):
                 compressedVideoPath = video
@@ -152,10 +144,9 @@ final class FYVideoCompressorTests: XCTestCase {
     
     func testCompressVideoWithFPS() {
         let expectation = XCTestExpectation(description: "compress video")
-        let config = FYVideoCompressor.CompressionConfig(fps: 24)
         
         var compressedVideoPath: URL!
-        compressor.compressVideo(sampleVideoPath, config: config) { result in
+        compressor.compressVideo(sampleVideoPath, config: .h264(fps: 24)) { result in
             switch result {
             case .success(let video):
                 compressedVideoPath = video
@@ -174,10 +165,9 @@ final class FYVideoCompressorTests: XCTestCase {
     
     func testCompressVideoWithAudioSampleRate() {
         let expectation = XCTestExpectation(description: "compress video")
-        let config = FYVideoCompressor.CompressionConfig(audioSampleRate: 44100)
         
         var compressedVideoPath: URL!
-        compressor.compressVideo(sampleVideoPath, config: config) { result in
+        compressor.compressVideo(sampleVideoPath, config: .h264().audio(bitrate: 128000, sampleRate: 44100)) { result in
             switch result {
             case .success(let video):
                 compressedVideoPath = video
@@ -195,10 +185,9 @@ final class FYVideoCompressorTests: XCTestCase {
     
     func testCompressVideoWithAudioBitrate() {
         let expectation = XCTestExpectation(description: "compress video")
-        let config = FYVideoCompressor.CompressionConfig(audioBitrate: 128000)
         
         var compressedVideoPath: URL!
-        compressor.compressVideo(sampleVideoPath, config: config) { result in
+        compressor.compressVideo(sampleVideoPath, config: .h264().audio(bitrate: 128000)) { result in
             switch result {
             case .success(let video):
                 compressedVideoPath = video
@@ -212,11 +201,6 @@ final class FYVideoCompressorTests: XCTestCase {
         XCTAssertNotNil(compressedVideoPath)
         compressedVideoPaths.append(compressedVideoPath)
         XCTAssertTrue(self.sampleVideoPath.sizePerMB() > compressedVideoPath.sizePerMB())
-    }
-    
-    func testTargetVideoSizeWithQuality() {
-        let targetSize = compressor.calculateSizeWithQuality(.lowQuality, originalSize: CGSize(width: 1920, height: 1080))
-        XCTAssertEqual(targetSize, CGSize(width: 398, height: 224))
     }
     
     func testTargetVideoSizeWithConfig() {

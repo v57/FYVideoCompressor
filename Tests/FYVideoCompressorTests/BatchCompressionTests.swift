@@ -79,7 +79,7 @@ class BatchCompressionTests: XCTestCase {
         var allSampleVideosCount = sampleVideoPath.count
         
         sampleVideoPath.values.forEach { sampleVideo in
-            FYVideoCompressor().compressVideo(sampleVideo, quality: .lowQuality) { result in
+            FYVideoCompressor().compressVideo(sampleVideo, config: .h264(fps: 24, bitrate: 4000_000, size: nil, frameReordering: true)) { result in
                 switch result {
                 case .success(let video):
                     self.compressedVideoPath[sampleVideo] = video

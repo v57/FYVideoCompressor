@@ -23,7 +23,7 @@ public class FYVideoCompressor {
     
     // Compression Encode Parameters
     public struct CompressionConfig {
-        public static func h264(fps: Float, bitrate: Int, size: CGSize?, maxKeyframeInterval: Int = 10, frameReordering: Bool) -> Self {
+        public static func h264(fps: Float = 24, bitrate: Int = 1_000_000, size: CGSize? = nil, maxKeyframeInterval: Int = 10, frameReordering: Bool = true) -> Self {
             var settings = VideoCompressorSettings()
                 .codec(.h264)
                 .compression(bitrate: Float(bitrate), quality: 0, frameReordering: frameReordering)
@@ -108,10 +108,6 @@ public class FYVideoCompressor {
     public var videoFrameReducer: VideoFrameReducer!
     
     public init() { }
-    
-    /// Youtube suggests 1Mbps for 24 frame rate 360p video, 1Mbps = 1000_000bps.
-    /// Custom quality will not be affected by this value.
-    static public var minimumVideoBitrate = 1000 * 200
     
     /// Compress Video with config.
     public func compressVideo(_ url: URL, config: CompressionConfig, frameReducer: VideoFrameReducer = ReduceFrameEvenlySpaced(), progress: ((CMTime, CMTime) -> Void)? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
