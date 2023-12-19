@@ -24,7 +24,7 @@ public class FYVideoCompressor {
     // Compression Encode Parameters
     public struct CompressionConfig {
         public static func h264(fps: Float = 24, bitrate: Int = 1_000_000, size: CGSize? = nil, maxKeyframeInterval: Int = 10, frameReordering: Bool = true) -> Self {
-            var settings = VideoCompressorSettings()
+            let settings = VideoCompressorSettings()
                 .codec(.h264)
                 .compression(bitrate: Float(bitrate), quality: 0, frameReordering: frameReordering)
                 .keyframeInterval(maxKeyframeInterval)
@@ -36,7 +36,7 @@ public class FYVideoCompressor {
             other(codec: .hevc, fps: fps, quality: quality, size: size, frameReordering: frameReordering)
         }
         public static func other(codec: AVVideoCodecType, fps: Float, quality: Float, size: CGSize?, frameReordering: Bool) -> Self {
-            var settings = VideoCompressorSettings()
+            let settings = VideoCompressorSettings()
                 .codec(codec)
                 .compression(bitrate: 0, quality: quality, frameReordering: frameReordering)
             var config = CompressionConfig(settings: settings, fps: fps, fileType: .mov, scale: size)
