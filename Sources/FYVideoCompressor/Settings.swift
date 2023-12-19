@@ -155,7 +155,7 @@ public enum Hevc {
       switch self {
       case .main: return kVTProfileLevel_HEVC_Main_AutoLevel as String
       case .main10: return kVTProfileLevel_HEVC_Main10_AutoLevel as String
-      case .main42210: if #available(macOS 12.3, *) {
+      case .main42210: if #available(iOS 15.4, macOS 12.3, tvOS 15.4, *) {
         return kVTProfileLevel_HEVC_Main42210_AutoLevel as String
       } else {
         return kVTProfileLevel_HEVC_Main10_AutoLevel as String
