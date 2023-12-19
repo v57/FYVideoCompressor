@@ -53,7 +53,7 @@ class TestUserDefinedPath: XCTestCase {
         
         XCTAssertTrue(FileManager.default.isValidDirectory(atPath: compressedVideoPath), "user defined path is invalid")
         
-      compressor.compressVideo(sampleVideoPath, config: .h264(fps: 24, bitrate: 4000_000, size: nil, frameReordering: true).output(compressedVideoPath)) { result in
+      compressor.compressVideo(sampleVideoPath, config: .h264(fps: 24, bitrate: 100_000, size: nil, frameReordering: true).output(compressedVideoPath)) { result in
             switch result {
             case .success(let video):
                 self.compressedVideoPath = video
