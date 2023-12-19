@@ -9,57 +9,16 @@ import CoreMedia
 public class FYVideoCompressor {
     public enum VideoCompressorError: Error, LocalizedError {
         case noVideo
-        case compressedFailed(_ error: Error)
         case outputPathNotValid(_ path: URL)
         
         public var errorDescription: String? {
             switch self {
             case .noVideo:
                 return "No video"
-            case .compressedFailed(let error):
-                return error.localizedDescription
             case .outputPathNotValid(let path):
                 return "Output path is invalid: \(path)"
             }
         }
-    }
-    
-    /// Quality configuration. VideoCompressor will compress video by decreasing fps and bitrate.
-    /// Bitrate has a minimum value: `minimumVideoBitrate`, you can change it if need.
-    /// The video will be compressed using H.264, audio will be compressed using AAC.
-    public enum VideoQuality: Equatable {
-        /// Scale video size proportionally, not large than 224p and
-        /// reduce fps and bit rate if need.
-        case lowQuality
-        
-        /// Scale video size proportionally, not large than 480p and
-        /// reduce fps and bit rate if need.
-        case mediumQuality
-        
-        /// Scale video size proportionally, not large than 1080p and
-        /// reduce fps and bit rate if need.
-        case highQuality
-        
-        /// reduce fps and bit rate if need.
-        /// Scale video size with specified `scale`.
-        case custom(fps: Float = 24, bitrate: Int = 1000_000, scale: CGSize)
-        
-        /// fps and bitrate.
-        /// This bitrate value is the maximum value. Depending on the video original bitrate, the video bitrate after compressing may be lower than this value.
-        /// Considering that the video size taken by mobile phones is reversed, we don't hard code scale value.
-        var value: (fps: Float, bitrate: Int) {
-            switch self {
-            case .lowQuality:
-                return (15, 250_000)
-            case .mediumQuality:
-                return (24, 2500_000)
-            case .highQuality:
-                return (30, 8000_000)
-            case .custom(fps: let fps, bitrate: let bitrate, _):
-                return (fps, bitrate)
-            }
-        }
-        
     }
     
     // Compression Encode Parameters
@@ -150,91 +109,6 @@ public class FYVideoCompressor {
     /// Custom quality will not be affected by this value.
     static public var minimumVideoBitrate = 1000 * 200
     
-    /// Compress Video with quality.
-    
-    /// Compress Video with quality.
-    /// - Parameters:
-    ///   - url: path of the video that needs to be compressed
-    ///   - quality: the quality of the output video. Default is mediumQuality.
-    ///   - outputPath: compressed video will be moved to this path. If no value is set, `FYVideoCompressor` will create it for you. Default is nil.
-    ///   - frameReducer: video frame reducer to reduce fps of the video.
-    ///   - completion: completion block
-    public func compressVideo(_ url: URL,
-                              quality: VideoQuality = .mediumQuality,
-                              outputPath: URL? = nil,
-                              frameReducer: VideoFrameReducer = ReduceFrameEvenlySpaced(),
-                              progress: ((CMTime, CMTime) -> Void)? = nil,
-                              completion: @escaping (Result<URL, Error>) -> Void) {
-        self.videoFrameReducer = frameReducer
-        let asset = AVAsset(url: url)
-        // setup
-        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-            completion(.failure(VideoCompressorError.noVideo))
-            return
-        }
-        
-        print("video codec type: \(videoCodecType(for: videoTrack))")
-        
-        // --- Video ---
-        // video bit rate
-        let targetVideoBitrate = getVideoBitrateWithQuality(quality, originalBitrate: videoTrack.estimatedDataRate)
-        
-        // scale size
-        let scaleSize = calculateSizeWithQuality(quality, originalSize: videoTrack.naturalSize)
-        
-        let videoSettings = createVideoSettingsWithBitrate(targetVideoBitrate,
-                                                           maxKeyFrameInterval: 10,
-                                                           size: scaleSize)
-#if DEBUG
-        print("************** Video info **************")
-#endif
-        var audioTrack: AVAssetTrack?
-        var audioSettings: [String: Any]?
-        if let adTrack = asset.tracks(withMediaType: .audio).first {
-            // --- Audio ---
-            audioTrack = adTrack
-            let audioBitrate: Int
-            let audioSampleRate: Int
-            
-            audioBitrate = quality == .lowQuality ? 96_000 : 128_000 // 96_000
-            audioSampleRate = 44100
-            audioSettings = createAudioSettingsWithAudioTrack(adTrack, bitrate: Float(audioBitrate), sampleRate: audioSampleRate)
-        }
-#if DEBUG
-        print("🎬 Video ")
-        print("ORIGINAL:")
-        print("video size: \(url.sizePerMB())M")
-        print("bitrate: \(videoTrack.estimatedDataRate) b/s")
-        print("fps: \(videoTrack.nominalFrameRate)") //
-        print("scale size: \(videoTrack.naturalSize)")
-        
-        print("TARGET:")
-        print("video bitrate: \(targetVideoBitrate) b/s")
-        print("fps: \(quality.value.fps)")
-        print("scale size: (\(scaleSize))")
-        
-        print("****************************************")
-#endif
-        var _outputPath: URL
-        if let outputPath = outputPath {
-            _outputPath = outputPath
-        } else {
-            _outputPath = FileManager.tempDirectory(with: "CompressedVideo")
-        }
-        
-        let progress = CompressionProgress(duration: asset.duration, callback: progress)
-        _compress(asset: asset,
-                  fileType: .mp4,
-                  videoTrack,
-                  videoSettings,
-                  audioTrack,
-                  audioSettings,
-                  targetFPS: quality.value.fps,
-                  outputPath: _outputPath,
-                  progress: progress,
-                  completion: completion)
-    }
-    
     /// Compress Video with config.
     public func compressVideo(_ url: URL, config: CompressionConfig, frameReducer: VideoFrameReducer = ReduceFrameEvenlySpaced(), progress: ((CMTime, CMTime) -> Void)? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
         self.videoFrameReducer = frameReducer
@@ -246,9 +120,6 @@ public class FYVideoCompressor {
             return
         }
         
-#if DEBUG
-        print("video codec type: \(videoCodecType(for: videoTrack))")
-#endif
         let targetVideoBitrate: Float
         if Float(config.videoBitrate) > videoTrack.estimatedDataRate {
             let tempBitrate = videoTrack.estimatedDataRate/4
@@ -588,59 +459,6 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
     }
     
     // MARK: - Calculation
-    func getVideoBitrateWithQuality(_ quality: VideoQuality, originalBitrate: Float) -> Float {
-        var targetBitrate = Float(quality.value.bitrate)
-        if originalBitrate < targetBitrate {
-            switch quality {
-            case .lowQuality:
-                targetBitrate = originalBitrate/8
-                targetBitrate = max(targetBitrate, Float(Self.minimumVideoBitrate))
-            case .mediumQuality:
-                targetBitrate = originalBitrate/4
-                targetBitrate = max(targetBitrate, Float(Self.minimumVideoBitrate))
-            case .highQuality:
-                targetBitrate = originalBitrate/2
-                targetBitrate = max(targetBitrate, Float(Self.minimumVideoBitrate))
-            case .custom(_, _, _):
-                break
-            }
-        }
-        return targetBitrate
-    }
-    
-    func calculateSizeWithQuality(_ quality: VideoQuality, originalSize: CGSize) -> CGSize {
-        let originalWidth = originalSize.width
-        let originalHeight = originalSize.height
-        let isRotated = originalHeight > originalWidth // videos captured by mobile phone have rotated size.
-        
-        var threshold: CGFloat = -1
-        
-        switch quality {
-        case .lowQuality:
-            threshold = 224
-        case .mediumQuality:
-            threshold = 480
-        case .highQuality:
-            threshold = 1080
-        case .custom(_, _, let scale):
-            return scale
-        }
-        
-        var targetWidth: CGFloat = originalWidth
-        var targetHeight: CGFloat = originalHeight
-        if !isRotated {
-            if originalHeight > threshold {
-                targetHeight = threshold
-                targetWidth = threshold * originalWidth / originalHeight
-            }
-        } else {
-            if originalWidth > threshold {
-                targetWidth = threshold
-                targetHeight = threshold * originalHeight / originalWidth
-            }
-        }
-        return CGSize(width: Int(targetWidth), height: Int(targetHeight))
-    }
     
     func calculateSizeWithScale(_ scale: CGSize?, originalSize: CGSize) -> CGSize {
         guard let scale = scale else {
@@ -656,77 +474,6 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
         } else {
             let targetHeight = Int(scale.width * originalSize.height / originalSize.width)
             return CGSize(width: scale.width, height: CGFloat(targetHeight))
-        }
-    }
-    
-    /// Randomly drop some indexes to get final frames indexes
-    ///
-    /// 1. Calculate original frames and target frames
-    /// 2. Divide the range (0, `originalFrames`) into `targetFrames` parts equaly, eg., divide range 0..<9 into 3 parts: 0..<3, 3..<6. 6..<9
-    /// 3.
-    ///
-    /// - Parameters:
-    ///   - originFPS: original video fps
-    ///   - targetFPS: target video fps
-    /// - Returns: frame indexes
-    func getFrameIndexesWith(originalFPS: Float, targetFPS: Float, duration: Float) -> [Int] {
-        assert(originalFPS > 0)
-        assert(targetFPS > 0)
-        let originalFrames = Int(originalFPS * duration)
-        let targetFrames = Int(duration * targetFPS)
-        
-        //
-        var rangeArr = Array(repeating: 0, count: targetFrames)
-        for i in 0..<targetFrames {
-            rangeArr[i] = Int(ceil(Double(originalFrames) * Double(i+1) / Double(targetFrames)))
-        }
-        
-        var randomFrames = Array(repeating: 0, count: rangeArr.count)
-        
-        guard !randomFrames.isEmpty else {
-            return []
-        }
-        
-        // first frame
-        // avoid droping the first frame
-        guard randomFrames.count > 1 else {
-            return randomFrames
-        }
-        
-        for index in 1..<rangeArr.count {
-            let pre = rangeArr[index-1]
-            let res = Int.random(in: pre..<rangeArr[index])
-            randomFrames[index] = res
-        }
-        return randomFrames
-    }
-    
-    private func videoCodecType(for videoTrack: AVAssetTrack) -> String {
-        let res = videoTrack.formatDescriptions
-            .map { CMFormatDescriptionGetMediaSubType($0 as! CMFormatDescription).toString() }
-        return res.first ?? "unknown codec type"
-    }
-    
-    private func isKeyFrame(sampleBuffer: CMSampleBuffer) -> Bool {
-        guard let attachmentArray = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true) else {
-            return false
-        }
-        
-        let attachmentCount = CFArrayGetCount(attachmentArray)
-        if attachmentCount == 0 {
-            return true // Assume keyframe if no attachments are present
-        }
-        
-        let attachment = unsafeBitCast(
-            CFArrayGetValueAtIndex(attachmentArray, 0),
-            to: CFDictionary.self
-        )
-        
-        if let dependsOnOthers = CFDictionaryGetValue(attachment, Unmanaged.passUnretained(kCMSampleAttachmentKey_DependsOnOthers).toOpaque()) {
-            let value = Unmanaged<CFBoolean>.fromOpaque(dependsOnOthers).takeUnretainedValue()
-            return !CFBooleanGetValue(value)
-        } else {
-            return true // Assume keyframe if attachment is not present
         }
     }
 }
