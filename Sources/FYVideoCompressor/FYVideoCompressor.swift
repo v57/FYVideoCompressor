@@ -36,27 +36,27 @@ public class FYVideoCompressor {
     
     // Compression Encode Parameters
     public struct CompressionConfig {
-        public static func h264(fps: Float = 24, bitrate: Int = 1_000_000, size: CGSize? = nil, maxKeyframeInterval: Int = 10, frameReordering: Bool = true) -> Self {
+        public static func h264(fps: Float = 24, bitrate: Int = 1_000_000, size: CGSize? = nil, maxKeyframeInterval: Int = 10, frameReordering: Bool = true, profile: H264.ProfileLevel = .highAuto, entropy: H264.Entropy = .cabac) -> Self {
             let settings = VideoCompressorSettings()
                 .codec(.h264)
-                .compression(bitrate: Float(bitrate), quality: 0, frameReordering: frameReordering)
+                .compression(bitrate: Float(bitrate), frameReordering: frameReordering, profile: profile, entropy: entropy)
                 .keyframeInterval(maxKeyframeInterval)
             var config = CompressionConfig(settings: settings, fps: fps, fileType: .mp4, scale: size)
             config.bitrate = Float(bitrate)
             return config
         }
-        public static func hevc(fps: Float, quality: Float, size: CGSize?, frameReordering: Bool) -> Self {
+        public static func hevc(fps: Float, quality: Float, size: CGSize?, frameReordering: Bool, profile: Hevc.ProfileLevel = .main) -> Self {
             other(codec: .hevc, fps: fps, quality: quality, size: size, frameReordering: frameReordering)
         }
-        public static func other(codec: AVVideoCodecType, fps: Float, quality: Float, size: CGSize?, frameReordering: Bool) -> Self {
+        public static func other(codec: AVVideoCodecType, fps: Float, quality: Float, size: CGSize?, frameReordering: Bool = true, profile: Hevc.ProfileLevel = .main) -> Self {
             let settings = VideoCompressorSettings()
                 .codec(codec)
-                .compression(bitrate: 0, quality: quality, frameReordering: frameReordering)
+                .compression(quality: quality, frameReordering: frameReordering, profile: profile)
             var config = CompressionConfig(settings: settings, fps: fps, fileType: .mov, scale: size)
             config.quality = quality
             return config
         }
-        
+      
         public var settings: VideoCompressorSettings
         
         /// If video's fps less than this value, this value will be ignored. Default is 24.

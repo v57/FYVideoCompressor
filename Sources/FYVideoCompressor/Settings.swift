@@ -7,6 +7,7 @@
 
 import Foundation
 import AVFoundation
+import VideoToolbox
 
 public struct VideoCompressorSettings {
   public var settings: [String: Any] = [:]
@@ -50,17 +51,19 @@ public extension VideoCompressorSettings {
   func allowFrameReordering(_ value: Bool) -> Self {
     set(AVVideoAllowFrameReorderingKey, value)
   }
-  func compression(bitrate: Float, quality: Float, frameReordering: Bool, profile: H264.ProfileLevel = .highAuto, entropy: H264.Entropy = .cabac) -> Self {
+  func compression(bitrate: Float, frameReordering: Bool, profile: H264.ProfileLevel = .highAuto, entropy: H264.Entropy = .cabac) -> Self {
     compression {
-      if bitrate > 0 {
-        $0[AVVideoAverageBitRateKey] = bitrate
-      }
-      if quality > 0 {
-        $0[AVVideoQualityKey] = quality
-      }
+      $0[AVVideoAverageBitRateKey] = bitrate
       $0[AVVideoAllowFrameReorderingKey] = frameReordering
       $0[AVVideoProfileLevelKey] = profile.rawValue
       $0[AVVideoH264EntropyModeKey] = entropy.rawValue
+    }
+  }
+  func compression(quality: Float, frameReordering: Bool, profile: Hevc.ProfileLevel = .main) -> Self {
+    compression {
+      $0[AVVideoQualityKey] = quality
+      $0[AVVideoAllowFrameReorderingKey] = frameReordering
+      $0[AVVideoProfileLevelKey] = profile.rawValue
     }
   }
   func keyframeInterval(_ value: Int) -> Self {
@@ -140,6 +143,23 @@ public extension VideoCompressorSettings {
             AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_2020,
           ]
         }
+      }
+    }
+  }
+}
+
+public enum Hevc {
+  public enum ProfileLevel {
+    case main, main10, main42210
+    var rawValue: String {
+      switch self {
+      case .main: return kVTProfileLevel_HEVC_Main_AutoLevel as String
+      case .main10: return kVTProfileLevel_HEVC_Main10_AutoLevel as String
+      case .main42210: if #available(macOS 12.3, *) {
+        return kVTProfileLevel_HEVC_Main42210_AutoLevel as String
+      } else {
+        return kVTProfileLevel_HEVC_Main10_AutoLevel as String
+      }
       }
     }
   }
