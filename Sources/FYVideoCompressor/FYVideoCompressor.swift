@@ -23,16 +23,28 @@ public class FYVideoCompressor {
     
     // Compression Encode Parameters
     public struct CompressionConfig {
-        //Tag: video
+        public static func h264(fps: Float, bitrate: Int, size: CGSize?, maxKeyframeInterval: Int = 10, frameReordering: Bool) -> Self {
+            var settings = VideoCompressorSettings()
+                .codec(.h264)
+                .compression(bitrate: Float(bitrate), quality: 0, frameReordering: frameReordering)
+                .keyframeInterval(maxKeyframeInterval)
+            var config = CompressionConfig(settings: settings, fps: fps, fileType: .mp4, scale: size)
+            config.bitrate = Float(bitrate)
+            return config
+        }
+        public static func hevc(fps: Float, quality: Float, size: CGSize?, frameReordering: Bool) -> Self {
+            other(codec: .hevc, fps: fps, quality: quality, size: size, frameReordering: frameReordering)
+        }
+        public static func other(codec: AVVideoCodecType, fps: Float, quality: Float, size: CGSize?, frameReordering: Bool) -> Self {
+            var settings = VideoCompressorSettings()
+                .codec(codec)
+                .compression(bitrate: 0, quality: quality, frameReordering: frameReordering)
+            var config = CompressionConfig(settings: settings, fps: fps, fileType: .mov, scale: size)
+            config.quality = quality
+            return config
+        }
         
-        /// Config video bitrate.
-        /// If the input video bitrate is less than this value, it will be ignored.
-        /// bitrate use 1000 for 1kbps. https://en.wikipedia.org/wiki/Bit_rate.
-        /// Default is 1Mbps
-        public var videoBitrate: Int
-        
-        /// A key to access the maximum interval between keyframes. 1 means key frames only, H.264 only. Default is 10.
-        public var videomaxKeyFrameInterval: Int //
+        public var settings: VideoCompressorSettings
         
         /// If video's fps less than this value, this value will be ignored. Default is 24.
         public var fps: Float
@@ -41,11 +53,11 @@ public class FYVideoCompressor {
         
         /// Sample rate must be between 8.0 and 192.0 kHz inclusive
         /// Default 44100
-        public var audioSampleRate: Int
+        public var audioSampleRate: Int = 44100
         
         /// Default is 128_000
         /// If the input audio bitrate is less than this value, it will be ignored.
-        public var audioBitrate: Int
+        public var audioBitrate: Int = 128_000
         
         /// Default is mp4
         public var fileType: AVFileType
@@ -60,34 +72,26 @@ public class FYVideoCompressor {
         ///  Default is nil.
         public var outputPath: URL?
         
+        var bitrate: Float?
+        var quality: Float?
         
-        public init() {
-            self.videoBitrate = 1000_000
-            self.videomaxKeyFrameInterval = 10
-            self.fps = 24
-            self.audioSampleRate = 44100
-            self.audioBitrate = 128_000
-            self.fileType = .mp4
-            self.scale = nil
-            self.outputPath = nil
-        }
-        
-        public init(videoBitrate: Int = 1000_000,
-                    videomaxKeyFrameInterval: Int = 10,
-                    fps: Float = 24,
-                    audioSampleRate: Int = 44100,
-                    audioBitrate: Int = 128_000,
-                    fileType: AVFileType = .mp4,
-                    scale: CGSize? = nil,
-                    outputPath: URL? = nil) {
-            self.videoBitrate = videoBitrate
-            self.videomaxKeyFrameInterval = videomaxKeyFrameInterval
+        init(settings: VideoCompressorSettings, fps: Float, fileType: AVFileType, scale: CGSize?) {
+            self.settings = settings
             self.fps = fps
-            self.audioSampleRate = audioSampleRate
-            self.audioBitrate = audioBitrate
             self.fileType = fileType
             self.scale = scale
-            self.outputPath = outputPath
+        }
+        
+        public func audio(bitrate: Int, sampleRate: Int = 44100) -> Self {
+            var a = self
+            a.audioBitrate = bitrate
+            a.audioSampleRate = sampleRate
+            return a
+        }
+        public func output(_ url: URL) -> Self {
+            var a = self
+            a.outputPath = url
+            return a
         }
     }
     
@@ -120,18 +124,8 @@ public class FYVideoCompressor {
             return
         }
         
-        let targetVideoBitrate: Float
-        if Float(config.videoBitrate) > videoTrack.estimatedDataRate {
-            let tempBitrate = videoTrack.estimatedDataRate/4
-            targetVideoBitrate = max(tempBitrate, Float(Self.minimumVideoBitrate))
-        } else {
-            targetVideoBitrate = Float(config.videoBitrate)
-        }
-        
         let targetSize = calculateSizeWithScale(config.scale, originalSize: videoTrack.naturalSize)
-        let videoSettings = createVideoSettingsWithBitrate(targetVideoBitrate,
-                                                           maxKeyFrameInterval: config.videomaxKeyFrameInterval,
-                                                           size: targetSize)
+        let videoSettings = config.settings.settings
         
         var audioTrack: AVAssetTrack?
         var audioSettings: [String: Any]?
@@ -165,7 +159,11 @@ public class FYVideoCompressor {
         
 #if DEBUG
         print("🎬: \(url.sizePerMB())MB, \(Int(videoTrack.naturalSize.width))x\(Int(videoTrack.naturalSize.height)), \(Int(videoTrack.estimatedDataRate / 1024)) kb/s, \(videoTrack.nominalFrameRate) fps")
-        print("📦: \(Int(targetSize.width))x\(Int(targetSize.height)), \(Int(targetVideoBitrate / 1024)) kb/s, \(config.fps) fps")
+        if let bitrate = config.bitrate {
+            print("📦: \(Int(targetSize.width))x\(Int(targetSize.height)), \(Int(bitrate / 1024)) kb/s, \(config.fps) fps")
+        } else if let quality = config.quality {
+            print("📦: \(Int(targetSize.width))x\(Int(targetSize.height)), \(quality)q, \(config.fps) fps")
+        }
 #endif
         
         let progress = CompressionProgress(duration: asset.duration, callback: progress)
