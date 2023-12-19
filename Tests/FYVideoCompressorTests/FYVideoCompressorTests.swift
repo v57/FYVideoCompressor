@@ -1,6 +1,7 @@
 import XCTest
 @testable import FYVideoCompressor
 import AVFoundation
+import VideoToolbox
 
 final class FYVideoCompressorTests: XCTestCase {
     // sample video websites: https://file-examples.com/index.php/sample-video-files/sample-mp4-files/
@@ -80,6 +81,26 @@ final class FYVideoCompressorTests: XCTestCase {
         compressedVideoPaths.append(compressedVideoPath)
         XCTAssertTrue(sampleVideoPath.sizePerMB() > compressedVideoPath.sizePerMB())
     }
+  
+  func testCompressHevcVideo() {
+      let expectation = XCTestExpectation(description: "compress video")
+      
+//        var sampleVideoPath = localVideoURL // sampleVideoPath
+      var compressedVideoPath: URL!
+      compressor.compressVideo(sampleVideoPath, config: .hevc(fps: 24, quality: 0.5, size: nil, frameReordering: true), frameReducer: ReduceFrameRandomly()) { result in
+          switch result {
+          case .success(let video):
+              compressedVideoPath = video
+              expectation.fulfill()
+          case .failure(let error):
+              XCTFail(error.localizedDescription)
+          }
+      }
+      wait(for: [expectation], timeout: 30)
+      XCTAssertNotNil(compressedVideoPath)
+      compressedVideoPaths.append(compressedVideoPath)
+      XCTAssertTrue(sampleVideoPath.sizePerMB() > compressedVideoPath.sizePerMB())
+  }
     
     func testCompressVideoWithScale() {
         let expectation = XCTestExpectation(description: "compress video")
