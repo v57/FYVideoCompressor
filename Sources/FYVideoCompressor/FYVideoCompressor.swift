@@ -121,7 +121,7 @@ public class FYVideoCompressor {
         }
         
         let targetSize = calculateSizeWithScale(config.scale, originalSize: videoTrack.naturalSize)
-        let videoSettings = config.settings.settings
+        let videoSettings = config.settings.width(targetSize.width).height(targetSize.height).settings
         
         var audioTrack: AVAssetTrack?
         var audioSettings: [String: Any]?
