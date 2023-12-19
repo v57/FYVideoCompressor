@@ -18,6 +18,13 @@ public protocol VideoFrameReducer {
     func reduce(originalFPS: Float, to targetFPS: Float, with videoDuration: Float) -> [Int]
 }
 
+public extension VideoFrameReducer where Self == ReduceFrameEvenlySpaced {
+  static var evenlySpaced: ReduceFrameEvenlySpaced { ReduceFrameEvenlySpaced() }
+}
+public extension VideoFrameReducer where Self == ReduceFrameRandomly {
+  static var randomly: ReduceFrameRandomly { ReduceFrameRandomly() }
+}
+
 /// Get frame index array evenly spaced
 public struct ReduceFrameEvenlySpaced: VideoFrameReducer {
     public init() {}

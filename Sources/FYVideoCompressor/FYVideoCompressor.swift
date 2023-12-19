@@ -110,7 +110,7 @@ public class FYVideoCompressor {
     public init() { }
     
     /// Compress Video with config.
-    public func compressVideo(_ url: URL, config: CompressionConfig, frameReducer: VideoFrameReducer = ReduceFrameEvenlySpaced(), progress: ((CMTime, CMTime) -> Void)? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
+    public func compressVideo(_ url: URL, config: CompressionConfig, frameReducer: VideoFrameReducer = .evenlySpaced, progress: ((CMTime, CMTime) -> Void)? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
         self.videoFrameReducer = frameReducer
         
         let asset = AVAsset(url: url)
