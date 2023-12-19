@@ -2,6 +2,19 @@ import Foundation
 import AVFoundation
 import CoreMedia
 
+public extension URL {
+    func compressVideo(_ config: FYVideoCompressor.CompressionConfig, frameReducer: VideoFrameReducer = .evenlySpaced, progress: ((CMTime, CMTime) -> Void)? = nil, completion: @escaping (Result<URL, Error>) -> Void) {
+        FYVideoCompressor().compressVideo(self, config: config, frameReducer: frameReducer, progress: progress, completion: completion)
+    }
+    @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+    @discardableResult
+    func compressVideo(_ config: FYVideoCompressor.CompressionConfig, frameReducer: VideoFrameReducer = .evenlySpaced, progress: ((CMTime, CMTime) -> Void)? = nil) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            compressVideo(config, frameReducer: frameReducer, progress: progress, completion: continuation.resume)
+        }
+    }
+}
+
 // sample video https://download.blender.org/demo/movies/BBB/
 
 /// A high-performance, flexible and easy to use Video compressor library written by Swift.
