@@ -99,6 +99,7 @@ public extension VideoCompressorSettings {
   enum Color {
     case hd, sd, wideGamut, wideGamut10Bit
     @available(iOS 16.0, *)
+    @available(macOS 13.0, *)
     case hdrLinear
     var rawValue: [String: String] {
       switch self {
@@ -127,7 +128,7 @@ public extension VideoCompressorSettings {
           AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
         ]
       case .hdrLinear:
-        if #available(iOS 16.0, *) {
+        if #available(iOS 16.0, *), #available(macOS 13.0, *) {
           return [
             AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_2020,
             AVVideoTransferFunctionKey: AVVideoTransferFunction_Linear,
