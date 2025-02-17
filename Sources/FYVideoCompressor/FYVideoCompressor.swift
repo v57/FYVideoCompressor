@@ -10,7 +10,9 @@ public extension URL {
   @discardableResult
   func compressVideo(_ config: FYVideoCompressor.CompressionConfig, frameReducer: VideoFrameReducer = .evenlySpaced, progress: ((CMTime, CMTime) -> Void)? = nil) async throws -> URL {
     try await withCheckedThrowingContinuation { continuation in
-      compressVideo(config, frameReducer: frameReducer, progress: progress, completion: continuation.resume)
+      compressVideo(config, frameReducer: frameReducer, progress: progress) { result in
+        continuation.resume(with: result)
+      }
     }
   }
 }
