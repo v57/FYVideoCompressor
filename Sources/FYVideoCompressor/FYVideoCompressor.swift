@@ -87,6 +87,7 @@ public class FYVideoCompressor {
     
     var bitrate: Float?
     var quality: Float?
+    fileprivate var composition: AVVideoComposition?
     
     init(settings: VideoCompressorSettings, fps: Float, fileType: AVFileType, scale: CGSize?) {
       self.settings = settings
@@ -104,6 +105,15 @@ public class FYVideoCompressor {
     public func output(_ url: URL) -> Self {
       var a = self
       a.outputPath = url
+      return a
+    }
+    public func compose(_ compose: () -> (AVVideoComposition)) -> Self {
+      composition(compose())
+    }
+    @discardableResult
+    public func composition(_ composition: AVVideoComposition) -> Self {
+      var a = self
+      a.composition = composition
       return a
     }
   }
@@ -133,16 +143,17 @@ public class FYVideoCompressor {
       return
     }
     
-    let targetSize = calculateSizeWithScale(config.scale, originalSize: videoTrack.naturalSize)
+    let videoSize = videoTrack.naturalSize
+    var targetSize = calculateSizeWithScale(config.scale, originalSize: videoSize)
+    targetSize = CGSize(width: targetSize.height, height: targetSize.width)
     let videoSettings = config.settings.width(targetSize.width).height(targetSize.height).settings
     
-    var audioTrack: AVAssetTrack?
-    var audioSettings: [String: Any]?
     
-    if let adTrack = asset.tracks(withMediaType: .audio).first {
-      audioTrack = adTrack
+    let audio: AudioTrack?
+    
+    if let track = asset.tracks(withMediaType: .audio).first {
       let targetAudioBitrate: Float
-      if Float(config.audioBitrate) < adTrack.estimatedDataRate {
+      if Float(config.audioBitrate) < track.estimatedDataRate {
         targetAudioBitrate = Float(config.audioBitrate)
       } else {
         targetAudioBitrate = 64_000
@@ -156,7 +167,10 @@ public class FYVideoCompressor {
       } else {
         targetSampleRate = config.audioSampleRate
       }
-      audioSettings = createAudioSettingsWithAudioTrack(adTrack, bitrate: targetAudioBitrate, sampleRate: targetSampleRate)
+      let settings = createAudioSettingsWithAudioTrack(track, bitrate: targetAudioBitrate, sampleRate: targetSampleRate)
+      audio = AudioTrack(track: track, settings: settings)
+    } else {
+      audio = nil
     }
     
     var _outputPath: URL
@@ -176,16 +190,10 @@ public class FYVideoCompressor {
 #endif
     
     let progress = CompressionProgress(duration: asset.duration, callback: progress)
-    _compress(asset: asset,
-              fileType: config.fileType,
-              videoTrack,
-              videoSettings,
-              audioTrack,
-              audioSettings,
-              targetFPS: config.fps,
-              outputPath: _outputPath,
-              progress: progress,
-              completion: completion)
+    
+    let video = VideoTrack(track: videoTrack, settings: videoSettings, composition: config.composition)
+    let settings = Compress(asset: asset, fileType: config.fileType, video: video, audio: audio, fps: config.fps, output: _outputPath)
+    _compress(settings: settings, progress: progress, completion: completion)
   }
   
   /// Remove all cached compressed videos
@@ -205,38 +213,57 @@ public class FYVideoCompressor {
     }
   }
   
+  struct Compress {
+    let asset: AVAsset
+    let fileType: AVFileType
+    let video: VideoTrack
+    let audio: AudioTrack?
+    let fps: Float
+    let output: URL
+  }
+  struct VideoTrack {
+    let track: AVAssetTrack
+    let settings: [String: Any]
+    let composition: AVVideoComposition?
+  }
+  struct AudioTrack {
+    let track: AVAssetTrack
+    let settings: [String: Any]
+  }
+  
   // MARK: - Private methods
-  private func _compress(asset: AVAsset,
-                         fileType: AVFileType,
-                         _ videoTrack: AVAssetTrack,
-                         _ videoSettings: [String: Any],
-                         _ audioTrack: AVAssetTrack?,
-                         _ audioSettings: [String: Any]?,
-                         targetFPS: Float,
-                         outputPath: URL,
-                         progress: CompressionProgress,
-                         completion: @escaping (Result<URL, Error>) -> Void) {
+  private func _compress(settings: Compress, progress: CompressionProgress, completion: @escaping (Result<URL, Error>) -> Void) {
     // video
-    let videoOutput = AVAssetReaderTrackOutput.init(track: videoTrack,
-                                                    outputSettings: [kCVPixelBufferPixelFormatTypeKey as String:
-                                                                      kCVPixelFormatType_32BGRA])
-    let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-    videoInput.transform = videoTrack.preferredTransform // fix output video orientation
+    let video = settings.video
+    let videoOutput: AVAssetReaderOutput
+    if let composition = video.composition {
+      let composer = AVAssetReaderVideoCompositionOutput.init(videoTracks: [video.track],
+                                                                 videoSettings: [kCVPixelBufferPixelFormatTypeKey as String:
+                                                                        kCVPixelFormatType_32BGRA])
+      composer.videoComposition = composition
+      videoOutput = composer
+    } else {
+      videoOutput = AVAssetReaderTrackOutput.init(track: video.track,
+                                                      outputSettings: [kCVPixelBufferPixelFormatTypeKey as String:
+                                                                        kCVPixelFormatType_32BGRA])
+    }
+    let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: video.settings)
+    videoInput.transform = video.track.preferredTransform // fix output video orientation
     do {
+      var outputPath = settings.output
       guard FileManager.default.isValidDirectory(atPath: outputPath) else {
         completion(.failure(VideoCompressorError.outputPathNotValid(outputPath)))
         return
       }
       
-      var outputPath = outputPath
-      let videoName = UUID().uuidString + ".\(fileType.fileExtension)"
+      let videoName = UUID().uuidString + ".\(settings.fileType.fileExtension)"
       outputPath.appendPathComponent("\(videoName)")
       
       // store urls for deleting
       compressVideoPaths.append(outputPath)
       
-      let reader = try AVAssetReader(asset: asset)
-      let writer = try AVAssetWriter(url: outputPath, fileType: fileType)
+      let reader = try AVAssetReader(asset: settings.asset)
+      let writer = try AVAssetWriter(url: outputPath, fileType: settings.fileType)
       self.reader = reader
       self.writer = writer
       
@@ -252,12 +279,12 @@ public class FYVideoCompressor {
       // audio output
       var audioInput: AVAssetWriterInput?
       var audioOutput: AVAssetReaderTrackOutput?
-      if let audioTrack = audioTrack, let audioSettings = audioSettings {
+      if let audio = settings.audio {
         // Specify the number of audio channels we want when decompressing the audio from the asset to avoid error when handling audio data.
         // It really matters when the audio has more than 2 channels, e.g: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-        audioOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
+        audioOutput = AVAssetReaderTrackOutput(track: audio.track, outputSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
                                                                            AVNumberOfChannelsKey: 2])
-        let adInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+        let adInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audio.settings)
         audioInput = adInput
         if reader.canAdd(audioOutput!) {
           reader.add(audioOutput!)
@@ -278,11 +305,11 @@ public class FYVideoCompressor {
       // output video
       group.enter()
       
-      let reduceFPS = targetFPS < videoTrack.nominalFrameRate
+      let reduceFPS = settings.fps < video.track.nominalFrameRate
       
-      let frameIndexArr = videoFrameReducer.reduce(originalFPS: videoTrack.nominalFrameRate,
-                                                   to: targetFPS,
-                                                   with: Float(videoTrack.asset?.duration.seconds ?? 0.0))
+      let frameIndexArr = videoFrameReducer.reduce(originalFPS: video.track.nominalFrameRate,
+                                                   to: settings.fps,
+                                                   with: Float(video.track.asset?.duration.seconds ?? 0.0))
       
       outputVideoDataByReducingFPS(videoInput: videoInput,
                                    videoOutput: videoOutput,
@@ -367,7 +394,7 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
   }
   
   private func outputVideoDataByReducingFPS(videoInput: AVAssetWriterInput,
-                                            videoOutput: AVAssetReaderTrackOutput,
+                                            videoOutput: AVAssetReaderOutput,
                                             frameIndexArr: [Int],
                                             progress: CompressionProgress,
                                             completion: @escaping(() -> Void)) {
@@ -405,7 +432,7 @@ AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: bitrate,
   }
   
   private func outputAudioData(_ audioInput: AVAssetWriterInput,
-                               audioOutput: AVAssetReaderTrackOutput,
+                               audioOutput: AVAssetReaderOutput,
                                frameIndexArr: [Int],
                                completion:  @escaping(() -> Void)) {
     
