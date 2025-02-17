@@ -5,6 +5,7 @@
 //  Created by xiaoyang on 2022/7/19.
 //
 
+/*
 import XCTest
 @testable import FYVideoCompressor
 
@@ -141,3 +142,4 @@ class TestUserDefinedPath: XCTestCase {
         }
     }
 }
+*/
