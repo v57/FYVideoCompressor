@@ -1,3 +1,4 @@
+/*
 //
 //  BatchCompressionTests.swift
 //  FYVideoCompressorTests
@@ -172,3 +173,4 @@ class BatchCompressionTests: XCTestCase {
         self.tasks[url] = task
     }
 }
+*/

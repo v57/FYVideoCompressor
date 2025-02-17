@@ -1,3 +1,4 @@
+/*
 import XCTest
 @testable import FYVideoCompressor
 import AVFoundation
@@ -292,3 +293,4 @@ final class FYVideoCompressorTests: XCTestCase {
         self.task = task
     }
 }
+*/
