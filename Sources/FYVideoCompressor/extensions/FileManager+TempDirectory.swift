@@ -46,9 +46,6 @@ extension FileManager {
                 tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(pathComponent, isDirectory: true)
             }
         }
-        #if DEBUG
-        print("temp directory path \(tempURL)")
-        #endif
         return tempURL
     }
     
